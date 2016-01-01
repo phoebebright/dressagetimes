@@ -1,0 +1,109 @@
+<!doctype html>
+<head>
+    <meta charset="utf-8">
+    <title>HTML5 Sortable jQuery Plugin</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+
+
+    <style>
+        li {
+            list-style: none;
+        }
+        .arena {
+            background-color: #15852f;
+        }
+        .competition {
+            background-color: #c8ffc6;
+            padding: .5rem
+        }
+        .break {
+            background-color: #ffbc17;
+            padding: .5rem
+        }
+        .slot {
+
+            background-color: #ffffff;
+            color: #727272;
+            margin-bottom: .5rem;
+            padding: .5rem
+
+        }
+        .rider, .horse {
+            font-size: 11px;
+        }
+        .pop {
+            background-color: rgba(29, 216, 74, 0.27);
+        }
+
+    </style>
+</head>
+<body>
+<div class="px2 sm-px3 py2 mb3 col-8 mx-auto">
+
+
+    <section class="mb3">
+        <div class="p3 clearfix ">
+
+            <div class="col-md-4 ">
+                <h2>Arena 1</h2>
+                <ul id="arena1" class=" arena">
+                </ul>
+
+                <ul id="arena2" class=" arena">
+                </ul>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<script id="class-template" type="text/x-handlebars-template">
+    <li class="competition">
+        <h3>{{name}} <span class="pull-right">{{start_time}}</span></h3>
+        <ul id="class{{classid}}" class="slots">
+
+        </ul>
+    </li>
+    <li class="break">Break 1</li>
+</script>
+
+<script id="slot-template" type="text/x-handlebars-template">
+    <div class="row">
+        <div class="col-xs-9">
+            <div class="rider">{{rider}}</div>
+            <div class="horse">{{horse}}</div>
+        </div>
+        <div class="col-xs-3 slottime"><span class="pull-right">{{start_time}}</span></div>
+    </div>
+    </div>
+</script>
+
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<script src="./html.sortable.js"></script>
+<script src="//d3js.org/d3.v3.min.js" ></script>
+<script src="moment.min.js" ></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.5/handlebars.min.js" ></script>
+<script src="simplestorage.js" ></script>
+<script src="timeslots.js" ></script>
+
+<script>
+    class_data = new Array();
+    arena_start = moment().hour(9).minute(0);
+
+    $(document).ready(function() {
+
+        class_template = Handlebars.compile($("#class-template").html());
+        slot_template = Handlebars.compile($("#slot-template").html());
+
+
+        v = init();
+
+
+    });
+
+
+
+</script>
+</body>
+</html>
