@@ -3,6 +3,10 @@ VERSION = "0.01 1Jan16"
 //API = "http://gmd.pagekite.me/api/v1/scores/?format=json";
 API = "/api/v1/";
 
+// in debugging the code after a move, it appeared the code had already been run even though there was a breakpoint
+// at the start of the function.
+
+//TODO: handle blank rows in csv files
 
 viewModel = {
 
@@ -12,8 +16,11 @@ viewModel = {
     arena_list: new Array(),
     class_list : new Array(),
     slot_list : new Array(),
+    slot_by_class : new Array(),
+    rider_list: new Array(),
 
     class_map: new Array(),   // map class id to class item in class_list
+    slot_map: new Array(),
 
     load_data: function() {
         // check to see if data needs updating
@@ -44,8 +51,12 @@ viewModel = {
             this.arena_list = alist;
         }
 
-        this.class_list = simpleStorage.get("CLASS_DATA");
-        this.slot_list = simpleStorage.get("SLOT_DATA");
+        this.class_list = simpleStorage.get("CLASS_LIST");
+        this.class_map = simpleStorage.get("CLASS_MAP");
+        this.slot_list = simpleStorage.get("SLOT_LIST");
+        this.slot_by_class = simpleStorage.get("SLOT_BY_CLASS");
+        this.slot_map = simpleStorage.get("SLOT_MAP");
+        this.rider_list = simpleStorage.get("RIDER_LIST");
 
         //// create assoc arrays
         //$.each(that.arena_list, function() {
@@ -56,7 +67,7 @@ viewModel = {
         //    that.classes[this.id] = this;
         //});
         //
-        //$.each(that.slot_list, function() {
+        //$.each(that.slot_by_class, function() {
         //    that.slots[this.id] = this;
         //});
 
@@ -78,8 +89,8 @@ viewModel = {
 
         var that = this;
 
-        this.arena_list.push({'id': 1, 'name': 'Arena 1', start: moment().hour(9).minute(0)});
-        this.arena_list.push({'id': 2, 'name': 'Arena 2', start: moment().hour(9).minute(0)});
+        this.arena_list.push({'id': 1, 'name': 'Arena 1', start: moment().hour(9).minute(0).seconds(0)});
+        this.arena_list.push({'id': 2, 'name': 'Arena 2', start: moment().hour(9).minute(0).seconds(0)});
 
         simpleStorage.set("ARENA_DATA", that.arena_list);
 
@@ -95,17 +106,26 @@ viewModel = {
                 }
                 // will hold the total time, including breaks
                 data.total_duration = 0;
+
+                // put everything in arena 1 by default
+                if (typeof data['arena'] == "undefined") {
+                    d.arena = 1;
+                }
+
                 return data;
             })
             .get(function (error, rows) {
 
                 var class_rows = rows;
-                simpleStorage.set("CLASS_DATA", class_rows);
+                simpleStorage.set("CLASS_LIST", class_rows);
 
                 // create map so as to make it quick to retrieve class data
                 $.each(class_rows, function(i, d) {
                     that.class_map[d.classid] = i;
                 });
+
+
+                simpleStorage.set("CLASS_MAP", that.class_map);
 
                 // Load entries
                 d3.csv("data.csv")
@@ -113,13 +133,21 @@ viewModel = {
                         var data = d;
 
                         // ensure there is a start object, doesn't matter what the new value is
-                        if (!$.inArray("start", data)) {
+                        if (typeof data["start"] == "undefined") {
                             data.start = moment();
                             data.start_time = "";  // time as text
                         }
 
                         // get slot duration from class
-                        data.duration = parseFloat(class_rows[data.classid].test_duration);
+                        try {
+                            data.duration = parseFloat(class_rows[that.class_map[data.classid]].test_duration);
+                        } catch(e) {
+                            console.log("No class "+data.classid+" in classes.csv")
+                        }
+                        // allocate an id if one is not provided
+                        if (typeof data["id"] == "undefined") {
+                            data.id = i;
+                        }
 
                         return data;
                     })
@@ -127,17 +155,55 @@ viewModel = {
 
 
                         // group entries by class
-                        var data_by_class = d3.nest()
+                        var riders = d3.nest()
                             .key(function (d) {
-                                return d.classid;
+                                return d.rider;
+                            }).sortKeys(d3.ascending)
+                            .rollup(function (d) {
+                                return d.length;
                             })
-                            .map(rows);
+                            .entries(rows);
+
+                        riders.sort(function(a, b) {
+                            return d3.descending(a.values , b.values );
+                        });
+
+                        simpleStorage.set("RIDER_LIST", riders);
+
+                        // group entries by class
+                        //var data_by_class = d3.nest()
+                        //    .key(function (d) {
+                        //        return d.classid;
+                        //    })
+                        //    .entries(rows);
+                        //
+                        // $.each(data_by_class, function(i, d){
+                        //that.slot_by_class[i] = d.values;
+                        //
+                        //that.slot_map[d.key] = i;
+                    //});
+                        //
+
+
+                        $.each(rows, function(i,d) {
+
+                            if (typeof that.slot_by_class[d.classid] == "undefined") {
+                                that.slot_by_class[d.classid] = [];
+                            }
+                            that.slot_by_class[d.classid].push(d);
+                            that.slot_map[d.id] = i;
+
+                        });
 
 
 
                         // now save slot data
-                        simpleStorage.set("SLOT_DATA", data_by_class);
+
+                        simpleStorage.set("SLOT_LIST", rows);
+                        simpleStorage.set("SLOT_BY_CLASS", that.slot_by_class);
+                        simpleStorage.set("SLOT_MAP", that.slot_map);
                         that.load_from_localstorage();
+
                         that.draw();
 
                     });
@@ -147,17 +213,21 @@ viewModel = {
     clear_localstorage: function() {
 
         simpleStorage.deleteKey("ARENA_DATA");
-        simpleStorage.deleteKey("CLASS_DATA");
-        simpleStorage.deleteKey("SLOT_DATA");
+        simpleStorage.deleteKey("CLASS_LIST");
+        simpleStorage.deleteKey("SLOT_LIST");
     },
 
-    get_slot_data: function(classid) {
-        var data = this.slot_list[parseInt(classid)];
-        if (typeof data == "undefined") {
+    get_slot_list: function(classid) {
+        var i =  this.slot_map[classid];
+
+        // may have a class with no slots, in which case there will be nothing here
+        if (typeof this.slot_by_class[i] == "undefined" || this.slot_by_class[i] == null) {
             return [];
-        } else {
-            return data;
         }
+
+        return this.slot_by_class[i];
+
+
     },
     get_class_data: function(classid) {
         var i =  this.class_map[classid];
@@ -165,9 +235,9 @@ viewModel = {
     },
     get_class_duration: function(classid) {
 
-        var data = this.slot_list[classid];
+        var data = this.slot_by_class[classid];
 
-        if (typeof data != "undefined") {
+        if (typeof data != "undefined" && data != null) {
             var duration = d3.nest()
                 .key(function (d) {
                     return d.classid;
@@ -196,9 +266,10 @@ viewModel = {
         $.each(that.class_list, function (i, d) {
             if (d.classid == classid) {
                 if (previous) {
+                    // start of this class is the end of the previous class, if there is one
                     start = previous.end;
-                    return false;   // to exit each
                 }
+                return false;   // to exit each
             }
 
             previous = d;
@@ -215,7 +286,7 @@ viewModel = {
         var that = this;
 
 
-        // update class_data with start and end times
+        // update class_list with start and end times
         // TODO: assumes 1 arena
         $.each(this.class_list, function (i, d) {
 
@@ -240,19 +311,43 @@ viewModel = {
     recalculate_class_slots: function(classid) {
 
         var that = this;
-        var slot_data = this.get_slot_data(classid);
+        var slotlist = this.get_slot_list(classid);
+
+        // if no entries in class then slotlist is empty then nothing to do
+        if (slotlist.length > 0) {
+
+            var starts = moment(this.get_class_data(classid).start);
+
+            $.each(slotlist, function (i, d) {
+                d.start = moment(starts);
+                d.end = moment(d.start).add(d.duration, 'minutes');
+
+                starts = moment(d.end);
+
+            });
+        }
 
 
-        var starts = moment(this.get_class_data(classid).start);
-
-        $.each(slot_data, function (i, d) {
-            d.start = moment(starts);
-            d.end = moment(d.start).add(d.duration, 'minutes');
-
-            starts = moment(d.end);
-        });
 
     },
+
+    reorder_list: function(data, newpos, oldpos) {
+        // called after order has been chnaged
+
+
+        var moved_item = data[oldpos];
+
+        // remove from old position
+        data.splice(oldpos, 1);
+
+        // insert in new
+        data.splice(newpos, 0, moved_item)
+
+
+    },
+
+
+
 
     draw: function() {
 
@@ -261,6 +356,12 @@ viewModel = {
         $.each(this.class_list, function () {
             that.draw_slots(this);
         });
+
+        // show selection list of riders
+        that.draw_rider_list();
+
+        // select first in the list
+        viewModel.update_rider_info(that.rider_list[0].key);
 
         // make them sortable
         that.add_sortables();
@@ -279,16 +380,22 @@ viewModel = {
 
     },
 
-    draw_slots: function(class_data) {
+    draw_slots: function(class_list) {
 
         var that = this;
-        var slots = d3.select("#class" + class_data.classid);
-        var slot_data = this.get_slot_data(class_data.classid);
+        var slots = d3.select("#class" + class_list.classid);
+
+        // make deep copy of object otherwise items get truncated when items are sorted
+        var slot_list = this.get_slot_list(class_list.classid);
+
 
         slots.selectAll("li")
-            .data(slot_data)
+            .data(slot_list)
             .enter().append("li")
             .attr("class", "slot")
+            .on("click", function(d) {
+                that.update_rider_info(d.rider);
+            })
             .html(function (d, i) {
                 return that.make_slot(d, i);
             });
@@ -296,6 +403,23 @@ viewModel = {
 
     },
 
+    draw_rider_list: function() {
+
+        var list = d3.select("#riderlist")
+
+        list.selectAll("option")
+            .data(this.rider_list)
+            .enter()
+            .append("option")
+            .attr("value", function(d) {return d.key;})
+            .text(function(d) {
+                return d.key + "  (" + d.values + ")"; });
+
+        $("#riderlist").on("change", function(i,d){
+            viewModel.update_rider_info(this.value)
+        })
+
+    },
 
     make_class: function(d, i) {
         if (typeof d != "undefined") {
@@ -307,16 +431,84 @@ viewModel = {
     make_slot: function(d, i) {
         var this_class = this.get_class_data(d.classid)
 
+        // reget start time as it may have been updated
+
         d.start_time = moment(d.start).format("H:mm");
         return slot_template(d);
+    },
+
+    update_rider_info: function(rider) {
+
+        var html = "";
+
+        var riderslots = d3.selectAll(".slot")
+            .filter(function (d) {
+
+                if (typeof d != "undefined") {
+                    if (typeof d['rider'] != "undefined") {
+                        return d.rider === rider;
+                    }
+                } else {
+                    console.log("what is undefined?");
+                }
+
+                return false;
+            });
+
+        var prev_time = false;
+        riderslots.each(function(d,i) {
+
+            var difftxt = '';
+            var div_height = 20;
+
+            if (prev_time) {
+                diff = Math.abs(prev_time.diff(d.start, 'minutes'));
+                div_height = Math.floor(20 + (diff));
+                difftxt = Math.abs(prev_time.diff(d.start, 'minutes')) + " mins";
+            }
+            html += '<li><div class="diff text-center" style="height:' + div_height+ 'px">' + difftxt + '</div></li><li class="infoslot arena_1">' + this.innerHTML + '</li> ' ;
+
+            prev_time = d.start;
+        });
+
+        $("#riderinfo").html("<ul>" + html +"</ul");
+
+        // update dropdown list to match
+        $("#riderlist option").filter(function() {
+            return $(this).text() == rider;
+        }).prop('selected', true);
+
+
     },
 
     add_sortables: function() {
 
         $('.arena').sortable({
             forcePlaceholderSize: true,
-            placeholderClass: 'border border-orange mb1'
+            placeholderClass: 'border border-orange mb1',
+            connectWith: 'connected'
         });
+
+        $('.arena').sortable().bind('sortupdate', function (e, ui) {
+
+            var moved_data = ui.item[0].__data__;
+            var data = viewModel.class_list;
+
+            viewModel.reorder_list(data, ui.index, ui.oldindex);
+
+            viewModel.recalculate();
+            viewModel.update_rider_info(moved_data.rider)
+
+            var classes = d3.select("#arena" + moved_data.arena);
+
+            classes.selectAll("li")
+                .html(function (d, i) {
+                    return viewModel.make_class(d, i);
+                });
+
+
+        });
+
 
         $('.slots').sortable({
             forcePlaceholderSize: true,
@@ -326,6 +518,11 @@ viewModel = {
         $('.slots').sortable().bind('sortupdate', function (e, ui) {
 
             var moved_data = ui.item[0].__data__;
+            var data = viewModel.get_slot_list(moved_data.classid);
+
+            viewModel.reorder_list(data, ui.index, ui.oldindex);
+            viewModel.recalculate_class_slots(moved_data.classid);
+            viewModel.update_rider_info(moved_data.rider)
 
             var slots = d3.select("#class" + moved_data.classid);
 
@@ -343,7 +540,12 @@ viewModel = {
                     return d.rider === moved_data.rider;
                 });
 
-        })
+        });
+
+
+
+
+
     }
 
 }

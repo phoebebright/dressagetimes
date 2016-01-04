@@ -1,0 +1,4 @@
+rider info
+
+- picklist of riders ordered by num tests
+- create riderinfo from array and needs to be ordered by start time and show diff

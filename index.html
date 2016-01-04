@@ -9,9 +9,34 @@
         li {
             list-style: none;
         }
+
         .arena {
-            background-color: #15852f;
+            padding-left:5px;
+            padding-top: 5px;
+            min-height:50px;
         }
+        .arena_1 {
+            background-color: #fdae61;
+            color: #313131;
+
+        }
+        .arena_2 {
+            background-color: #ffffbf;
+            color: #313131;
+        }
+        .arena_3 {
+            background-color: #abdda4;
+            color: #313131;
+        }
+        .arena_4 {
+            background-color: #2b83ba;
+            color: #fff;
+        }
+        .arena_5 {
+            background-color: #d7191c;
+            color: #fff;
+        }
+
         .competition {
             background-color: #c8ffc6;
             padding: .5rem
@@ -19,6 +44,12 @@
         .break {
             background-color: #ffbc17;
             padding: .5rem
+        }
+        .classname {
+            font-size: 18px;
+        }
+        .slots {
+            padding-left:0px;
         }
         .slot {
 
@@ -28,6 +59,19 @@
             padding: .5rem
 
         }
+
+        .diff {
+            vertical-align: middle;
+        }
+
+        #riderinfo li {
+
+            color: #727272;
+            margin-bottom: .5rem;
+            padding: .1rem
+
+        }
+
         .rider, .horse {
             font-size: 11px;
         }
@@ -38,29 +82,52 @@
     </style>
 </head>
 <body>
-<div class="px2 sm-px3 py2 mb3 col-8 mx-auto">
+<h1>Dressage Test Times</h1>
+
+<div class="container-fluid">
+
+    <div class="row">
+        <button id="expand" class="btn btn-default" >Expand All</button>
+    </div>
 
 
-    <section class="mb3">
-        <div class="p3 clearfix ">
+    <div class="row">
 
-            <div class="col-md-4 ">
-                <h2>Arena 1</h2>
-                <ul id="arena1" class=" arena">
-                </ul>
+        <div class="col-md-4 ">
+            <h2>Arena 1</h2>
+            <ul id="arena1" class="arena arena_1">
+            </ul>
+        </div>
+        <div class="col-md-4 ">
+            <h2>Arena 2</h2>
+            <ul id="arena2" class="arena arena_2">
 
-                <ul id="arena2" class=" arena">
-                </ul>
+            </ul>
+        </div>
+
+        <div class="col-md-4" >
+            <div data-spy="affix" data-offset-top="20">
+                <h2>Riders</h2>
+                <div id="riderselect">
+                    <select id="riderlist" class="form-control"></select>
+                </div>
+                <div id="riderinfo" >
+
+                </div>
             </div>
         </div>
-    </section>
 
+
+
+
+    </div>
 </div>
 
 <script id="class-template" type="text/x-handlebars-template">
     <li class="competition">
-        <h3>{{name}} <span class="pull-right">{{start_time}}</span></h3>
-        <ul id="class{{classid}}" class="slots">
+
+        <h3 class="classname collapsible" data-toggle="collapse"  data-target="#class{{classid}}" >{{name}} <span class="pull-right">{{start_time}}</span></h3>
+        <ul id="class{{classid}}" class="slots collapse" >
 
         </ul>
     </li>
@@ -69,13 +136,19 @@
 
 <script id="slot-template" type="text/x-handlebars-template">
     <div class="row">
-        <div class="col-xs-9">
+        <div class="col-xs-2">
+            <span class="badge">{{classid}}</span>
+        </div>
+
+        <div class="col-xs-8">
             <div class="rider">{{rider}}</div>
             <div class="horse">{{horse}}</div>
         </div>
-        <div class="col-xs-3 slottime"><span class="pull-right">{{start_time}}</span></div>
+        <div class="col-xs-2 slottime">
+            <span class="pull-right">{{start_time}}</span>
+        </div>
     </div>
-    </div>
+
 </script>
 
 <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
@@ -88,7 +161,7 @@
 <script src="timeslots.js" ></script>
 
 <script>
-    class_data = new Array();
+
     arena_start = moment().hour(9).minute(0);
 
     $(document).ready(function() {
@@ -99,7 +172,9 @@
 
         v = init();
 
-
+        $("#expand").on("click", function() {
+            $(".collapse").collapse('toggle');
+        })
     });
 
 
